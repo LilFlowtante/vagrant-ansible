@@ -1,0 +1,5 @@
+﻿- hosts: all
+  roles:
+    - { role: apache, become: true }
+    - { role: java, become: true }
+    - { role: jenkins, become: true }
