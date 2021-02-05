@@ -1,29 +1,92 @@
-- name: Set Jenkins password file
-  set_fact:
-    admin_user_pass: 'Ansible Elite'
+  - name: Set Jenkins password file
+    set_fact:
+      admin_user_pass: 'AnsibleElite'
+      
+  - name: Set Jenkins plugins list
+    set_fact:
+      jenkins_plugins:
+        - ant
+        - apache-httpcomponents-client-4-api
+        - bootstrap4-api
+        - bouncycastle-api
+        - branch-api
+        - build-timeout
+        - command-launcher
+        - credentials-binding
+        - credentials
+        - display-url-api
+        - durable-task
+        - echarts-api
+        - email-ext
+        - cloudbees-folder
+        - font-awesome-api
+        - git-client
+        - git
+        - git-server
+        - github-api
+        - github-branch-source
+        - github
+        - gradle
+        - jackson2-api
+        - ace-editor
+        - handlebars
+        - momentjs
+        - jquery3-api
+        - jsch
+        - junit
+        - ldap
+        - lockable-resources
+        - matrix-auth
+        - antisamy-markup-formatter
+        - pam-auth
+        - workflow-aggregator
+        - pipeline-github-lib
+        - pipeline-rest-api
+        - pipeline-stage-view
+        - resource-disposer
+        - ssh-slaves
+        - timestamper
+        - ws-cleanup
 
-- name: Ensure Jenkins Repository is Installed
-  apt_key: url=https://pkg.jenkins.io/debian-stable/jenkins.io.key state=present
-  become: yes
- 
-- name: Ensure the repository is configured
-  apt_repository: repo='deb https://pkg.jenkins.io/debian-stable binary/' state=present
-  become: yes
-  
-- name: Ensure jenkins is installed
-  apt: name=jenkins update_cache=yes
-  become: yes
-  
-- name: ensure jenkins is running
-  service: name=jenkins state=started
     
-- name: read admin pwd
-  shell: cat /var/lib/jenkins/secrets/initialAdminPassword
-  register: adminpwd  
+  - name: install jre8
+    apt:
+     name: openjdk-8-jre
+     state: present
+     update_cache: yes
+    become: true
 
-- name: unlock and add admin user
-  jenkins_script:
-    script: |
+  - name: Ensure Jenkins Repository is Installed
+    apt_key: url=https://pkg.jenkins.io/debian-stable/jenkins.io.key state=present
+    become: yes
+  
+  - name: Ensure the repository is configured
+    apt_repository: repo='deb https://pkg.jenkins.io/debian-stable binary/' state=present
+    become: yes
+  
+  - name: Ensure jenkins is installed
+    apt: name=jenkins update_cache=yes
+    become: yes
+  
+  - name: ensure jenkins is running
+    service: name=jenkins state=started
+    
+  - name: Finalize Jenkins Instalation 
+    wait_for:
+      timeout: 20
+    
+  - name: read admin pwd
+    shell: cat /var/lib/jenkins/secrets/initialAdminPassword
+    register: adminpwd  
+    until: adminpwd != ''
+    retries: 10
+    delay: 3
+    
+
+
+  - name: unlock and add admin user
+    jenkins_script:
+     script: |
       import jenkins.model.*
       import hudson.security.*
       def instance = Jenkins.getInstance()
@@ -34,26 +97,35 @@
       strategy.setAllowAnonymousRead(false)
       instance.setAuthorizationStrategy(strategy)
       instance.save()
-    args:
+     args:
       user_pwd: "{{ admin_user_pass }}"
-    user: admin
-    password: "{{ adminpwd.stdout }}"
+     user: admin
+     password: "{{ adminpwd.stdout }}"
 
-- name: complete setup wizard
-  jenkins_script:
-    script: |
+  - name: complete setup wizard
+    jenkins_script:
+     script: |
       import static jenkins.model.Jenkins.instance as jenkins
       import jenkins.install.InstallState
       if (!jenkins.installState.isSetupComplete()) {
         InstallState.INITIAL_SETUP_COMPLETED.initializeState()
       }
-    user: admin
-    password: "{{ adminpwd.stdout }}"
+     user: admin
+     password: "{{ adminpwd.stdout }}"
+     
+     
 
-# - name: install plugin
-    # jenkins_plugin:
-      # name: "{{ item }}"
-      # state: latest
-      # url_username: admin
-      # url_password: "{{ adminpwd.stdout }}"
-    # with_items: "{{ jenkins_plugins }}"
+  - name: install plugin
+    jenkins_plugin:
+     name: "{{ item }}"
+     state: latest
+     url_username: admin
+     url_password: "{{ adminpwd.stdout }}"
+     with_dependencies: true
+    with_items: "{{ jenkins_plugins }}"
+    
+  - name: Restart Jenkins to make the plugin data available
+    service: name=jenkins state=restarted
+    
+   
+    
