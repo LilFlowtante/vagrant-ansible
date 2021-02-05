@@ -48,14 +48,6 @@
         - timestamper
         - ws-cleanup
 
-    
-  - name: install jre8
-    apt:
-     name: openjdk-8-jre
-     state: present
-     update_cache: yes
-    become: true
-
   - name: Ensure Jenkins Repository is Installed
     apt_key: url=https://pkg.jenkins.io/debian-stable/jenkins.io.key state=present
     become: yes
@@ -68,23 +60,21 @@
     apt: name=jenkins update_cache=yes
     become: yes
   
-  - name: ensure jenkins is running
+  - name: Ensure jenkins is running
     service: name=jenkins state=started
     
   - name: Finalize Jenkins Instalation 
     wait_for:
       timeout: 20
     
-  - name: read admin pwd
+  - name: Read admin pwd
     shell: cat /var/lib/jenkins/secrets/initialAdminPassword
     register: adminpwd  
     until: adminpwd != ''
     retries: 10
     delay: 3
     
-
-
-  - name: unlock and add admin user
+  - name: Unlock and add admin user
     jenkins_script:
      script: |
       import jenkins.model.*
@@ -102,7 +92,7 @@
      user: admin
      password: "{{ adminpwd.stdout }}"
 
-  - name: complete setup wizard
+  - name: Complete setup wizard
     jenkins_script:
      script: |
       import static jenkins.model.Jenkins.instance as jenkins
@@ -113,9 +103,7 @@
      user: admin
      password: "{{ adminpwd.stdout }}"
      
-     
-
-  - name: install plugin
+  - name: Install plugin
     jenkins_plugin:
      name: "{{ item }}"
      state: latest
